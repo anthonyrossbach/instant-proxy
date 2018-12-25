@@ -40,13 +40,29 @@ if (!file_exists("source.txt")) {
 
 //Auto redirect to HTTPS first if not already using HTTPS
 //AKA If the domain we are on now has a valid certificate we should send the user to the HTTPS version of our site...
-if(empty($_SERVER['HTTPS']) || $_SERVER['HTTPS'] == "off"){
+$httpprefix="http://";
+if (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] == 'on') {
+    $httpprefix = "https://";
+}
+if (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == "https" || !empty($_SERVER['HTTP_X_FORWARDED_SSL']) && $_SERVER['HTTP_X_FORWARDED_SSL'] == "on") {
+    $httpprefix = "https://";
+}
+if (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] == "http" || !empty($_SERVER['HTTP_X_FORWARDED_SSL']) && $_SERVER['HTTP_X_FORWARDED_SSL'] == "off") {
+    $httpprefix = "http://";
+}
+if (!empty($_SERVER['REQUEST_SCHEME']) && $_SERVER['REQUEST_SCHEME'] == "http"){
+	$httpprefix="http://";
+}
+
+if($httpprefix=="http://"){
 	if (has_ssl($_SERVER['HTTP_HOST'])==true){
 		//Only redirect if we have a valid ssl cert first
 		$redirect = 'https://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
 		header('HTTP/1.1 301 Moved Permanently');
 		header('Location: ' . $redirect);
 		exit();
+	}else{
+		$httpprefix="http://";
 	}
 }
 
@@ -76,6 +92,7 @@ curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
 curl_setopt($ch, CURLOPT_URL, $url);
 curl_setopt($ch, CURLOPT_USERAGENT, $_SERVER['HTTP_USER_AGENT']);
 curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+curl_setopt($ch, CURLOPT_REFERER, $url);
 
 //If this reuqest is a post request forward on the POST data
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -95,20 +112,14 @@ if (curl_error($ch)) {
 //Set browser content type for the file and send that along so it renders as it should
 $contenttype = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
 header("Content-type: $contenttype");
+header("Access-Control-Allow-Origin: ".$httpprefix."".$_SERVER['HTTP_HOST']."", false);
 
 //Close connection
 curl_close($ch);
 
 //Check type here and change URL to new one for links and source content!
-if ($contentType=="text/html" || $contentType=="text/css" || $contentType=="application/javascript"){
-	$response = str_replace($source, $_SERVER['HTTP_HOST'], $response);
-}
-
-//Special fixes for domains
-if ($contentType=="text/html"){
-	if (strpos($source, 'notion.so') !== false) {
-		$response = str_replace("\"baseURL\":\"https://www.notion.so\"", "\"baseURL\":\"https://".$_SERVER['HTTP_HOST']."\"", $response);
-	}
+if (strpos($contenttype, 'text/html') !== false || strpos($contenttype, 'text/css') !== false || strpos($contenttype, 'application/javascript') !== false){
+	$response = str_replace($source, "".$httpprefix."".$_SERVER['HTTP_HOST']."", $response);
 }
 
 //Send the data to the browser and we are done
