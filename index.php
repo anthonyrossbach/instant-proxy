@@ -6,7 +6,7 @@ function has_ssl($domain) {
 	$orignal_parse = $domain;
 	$stream = @stream_context_create( array( 'ssl' => array( 'capture_peer_cert' => true ) ) );
 	$socket = @stream_socket_client( 'ssl://' . $orignal_parse . ':443', $errno, $errstr, 30, STREAM_CLIENT_CONNECT, $stream );
-	
+
 	// If we got a ssl certificate we check here, if the certificate domain
 	// matches the website domain.
 	if ( $socket ){
@@ -14,7 +14,7 @@ function has_ssl($domain) {
 		$cert_ressource = $cont['options']['ssl']['peer_certificate'];
 		$cert = openssl_x509_parse( $cert_ressource );
 		$listdomains=explode(',', $cert["extensions"]["subjectAltName"]);
-	
+
 		foreach ($listdomains as $v) {
 			if (strpos($v, $orignal_parse) !== false) {
 				$res=true;
@@ -22,6 +22,20 @@ function has_ssl($domain) {
 		}
 	}
 	return $res;
+}
+
+//If the source is not present then give the user a message, else save and redirect to site root
+if (!file_exists("source.txt")) {
+	if (!isset($_POST["domain"])){
+		echo "<html><head></head><body><h1 style='text-align:center;margin-top:150px;'>Thanks for installing, now you just need to setup your source url for example https://theusername.example.com by entering the source here without a trailing slash.<BR><BR><form action=\"index.php\" method=\"post\"><input type=\"text\" name=\"domain\"><br><input type=\"submit\"></form></h1></body></html>";
+		exit();
+	}else{
+		$source=$_POST["domain"];
+		file_put_contents("source.txt", $source);
+		echo "<h1>Success! This domain will now proxy traffic</h1>";
+		header("Location: https://".$_SERVER['HTTP_HOST']."");
+		exit();
+	}
 }
 
 //Auto redirect to HTTPS first if not already using HTTPS
@@ -48,12 +62,13 @@ if ($link_request=="/"){
 
 //Remove www. from our request to the backend server.
 $mydomain = str_replace("www.", "", $_SERVER['HTTP_HOST']);
+$source=file_get_contents("source.txt");
 
 //The URL to request, if you want to use a sub domain insted use this
 //$url = 'https://'.$mydomain.'.example.com' . $link_request;
 //If you dont want to load based on say a username just use this
 //$url = 'https://theusername.example.com' . $link_request;
-$url = 'https://example.com/domain/'.$mydomain.'' . $link_request;
+$url = ''.$source.'' .$link_request;
 
 //Send request, with the current visitors useragent
 $ch = curl_init();
@@ -78,11 +93,16 @@ if (curl_error($ch)) {
 }
 
 //Set browser content type for the file and send that along so it renders as it should
-$contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
-header("Content-type: $contentType");
+$contenttype = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+header("Content-type: $contenttype");
 
 //Close connection
 curl_close($ch);
+
+//Check type here and change URL to new one for links and source content!
+if ($contentType=="text/html" || $contentType=="text/css" || $contentType=="application/javascript"){
+	$response = str_replace($source, $_SERVER['HTTP_HOST'], $response);
+}
 
 //Send the data to the browser and we are done
 echo $response;
