@@ -104,6 +104,13 @@ if ($contentType=="text/html" || $contentType=="text/css" || $contentType=="appl
 	$response = str_replace($source, $_SERVER['HTTP_HOST'], $response);
 }
 
+//Special fixes for domains
+if ($contentType=="text/html"){
+	if (strpos($source, 'notion.so') !== false) {
+		$response = str_replace("\"baseURL\":\"https://www.notion.so\"", "\"baseURL\":\"https://".$_SERVER['HTTP_HOST']."\"", $response);
+	}
+}
+
 //Send the data to the browser and we are done
 echo $response;
 
